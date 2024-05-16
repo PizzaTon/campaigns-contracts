@@ -23,9 +23,15 @@ export const OperationCodes = {
             donate: 0x11f5b26f,
         },
         jetton: {
+            mint: 21,
             transfer: 0xf8a7ea5,
             notification: 0x7362d09c,
-            burn: 0x595f07bc
+            burn: 0x595f07bc,
+            internalTransfer: 0x178d4519,
+            burnNotification: 0x7bdd97de,
+            provideWalletAddress: 0x2c76b973,
+            takeWalletAddress: 0xd1735400,
+            updateContent: 0x4,
         },
         updateOwner: 0x3,
         changeContent: 0x4,
