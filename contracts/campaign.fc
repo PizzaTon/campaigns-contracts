@@ -69,16 +69,7 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
     slice cs = in_msg_full.begin_parse();
     int flags = cs~load_uint(4);
 
-    if (flags & 1) { ;; ignore all bounced messages
-        return ();
-    }
     slice sender_address = cs~load_msg_addr();
-
-    cs~load_msg_addr(); ;; skip dst
-    cs~load_coins(); ;; skip value
-    cs~skip_bits(1); ;; skip extracurrency collection
-    cs~load_coins(); ;; skip ihr_fee
-    int fwd_fee = muldiv(cs~load_coins(), 3, 2); ;; we use message fwd_fee for estimation of forward_payload costs
 
     (int init?, int index, slice collection_address, slice owner_address, cell content, int revoked_at, int active_until, int status, cell routers, cell balances) = load_data();
     if (~ init?) {
@@ -104,43 +95,20 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
     }
 
     int op = in_msg_body~load_uint(32);
+
+    if (flags & 1) { ;; route all prove_ownership bounced messages to owner
+        ;; first op was 0xffffffff, because of bounced, now we need to read real one
+        op = in_msg_body~load_uint(32);
+
+        if (op == op::ownership_proof()) {
+            int query_id = in_msg_body~load_uint(64);
+            ;; mode 64 = carry all the remaining value of the inbound message
+            send_msg(flag::regular(), owner_address, 0, op::ownership_proof_bounced(), query_id, null(), 64);
+        }
+        return ();
+    }
+
     int query_id = in_msg_body~load_uint(64);
-
-    if (op == op::jetton_transfer_notification()) {
-        int amount = in_msg_body~load_coins();
-        slice from_address = in_msg_body~load_msg_addr();
-        cell forward_payload = in_msg_body~load_maybe_ref();
-
-        cell msg = begin_cell()
-        .store_uint(op::jetton_transfer(), 32)
-        .store_uint(query_id, 64)
-        .store_coins(amount) ;; jetton amount
-        .store_slice(owner_address) ;; destination
-        .store_slice(from_address) ;; response_address (maybe replace with from_address)
-        .store_uint(0, 1)
-        .store_coins(0)
-        .store_uint(0, 1)
-        .end_cell();
-
-        var msg_body = begin_cell()
-        .store_uint(0x18, 6)
-        .store_slice(sender_address)
-        .store_coins(0)
-        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-        .store_ref(msg);
-        send_raw_message(msg_body.end_cell(), 64);
-        return ();
-    }
-
-    ;; NFT related operations
-    if (op == op::transfer()) {
-        throw(413);
-    }
-
-    if (op == op::get_static_data()) { ;; get static data
-        send_msg(flag::regular(), sender_address, 0, op::report_static_data(), query_id, begin_cell().store_uint(index, 256).store_slice(collection_address), 64);  ;; carry all the remaining value of the inbound message
-        return ();
-    }
 
     ;; SBT related operations
     if (op == op::request_owner()) {
@@ -184,18 +152,72 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
         store_data(index, collection_address, owner_address, content, revoked_at, active_until, status, routers, balances);
         return ();
     }
-    if (op == op::take_excess()) { ;; this will function as campaign's withdraw method
-        {-
-        This operation will send the whole reserved balance (except min_tons_for_storage) to the collection address
-        to split the PizzaTon and the Creator's share
-      -}
-
+    if (op == op::take_excess()) {
         throw_unless(401, equal_slices(owner_address, sender_address));
 
         ;; reserve amount for storage
         raw_reserve(min_tons_for_storage(), 0);
 
-        send_msg(flag::regular(), collection_address, 0, op::split_shares(), query_id, begin_cell().store_slice(owner_address), 128);
+        send_msg(flag::regular(), sender_address, 0, op::excesses(), query_id, null(), 128);
+        return ();
+    }
+    if (op == op::prove_ownership()) {
+        throw_unless(401, equal_slices(owner_address, sender_address));
+
+        slice dest = in_msg_body~load_msg_addr();
+        cell body = in_msg_body~load_ref();
+        int with_content = in_msg_body~load_uint(1);
+
+        var msg = begin_cell()
+        .store_uint(index, 256)
+        .store_slice(owner_address)
+        .store_ref(body)
+        .store_uint(revoked_at, 64)
+        .store_uint(with_content, 1);
+
+        if (with_content != 0) {
+            msg = msg.store_ref(content);
+        }
+
+        ;; mode 64 = carry all the remaining value of the inbound message
+        send_msg(flag::regular() | flag::bounce(), dest, 0, op::ownership_proof(), query_id, msg, 64);
+        return ();
+    }
+
+    ;; react to the jetton transfer notification
+    if (op == op::jetton_transfer_notification()) {
+        int amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        cell forward_payload = in_msg_body~load_maybe_ref();
+
+        cell msg = begin_cell()
+        .store_uint(op::jetton_transfer(), 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount) ;; jetton amount
+        .store_slice(owner_address) ;; destination
+        .store_slice(from_address) ;; response_address (maybe replace with from_address)
+        .store_uint(0, 1)
+        .store_coins(0)
+        .store_uint(0, 1)
+        .end_cell();
+
+        var msg_body = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg);
+        send_raw_message(msg_body.end_cell(), 64);
+        return ();
+    }
+
+    ;; NFT related operations
+    if (op == op::transfer()) {
+        throw(413);
+    }
+
+    if (op == op::get_static_data()) { ;; get static data
+        send_msg(flag::regular(), sender_address, 0, op::report_static_data(), query_id, begin_cell().store_uint(index, 256).store_slice(collection_address), 64);  ;; carry all the remaining value of the inbound message
         return ();
     }
 
@@ -279,15 +301,15 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
         store_data(index, collection_address, owner_address, content, revoked_at, active_until, -1, routers, balances);
         return ();
     }
-    ;;    if (op == op::contract_upgrade()) {
-    ;;        throw_unless(401, equal_slices(sender_address, collection_address));
-    ;;        set_code(in_msg_body~load_ref());
-    ;;        cell data = in_msg_body~load_maybe_ref();
-    ;;        if(~ cell_null?(data)) {
-    ;;            set_data(data);
-    ;;        }
-    ;;        return ();
-    ;;    }
+    if (op == op::contract_upgrade()) {
+        throw_unless(401, equal_slices(sender_address, collection_address));
+        set_code(in_msg_body~load_ref());
+        cell data = in_msg_body~load_maybe_ref();
+        if(~ cell_null?(data)) {
+            set_data(data);
+        }
+        return ();
+    }
 
     throw(0xffff);
 }

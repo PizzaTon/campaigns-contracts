@@ -5,12 +5,12 @@
 #include "./jetton-utils.fc";
 #include "./constants.fc";
 
-(int, int, slice, slice, cell, cell, cell) load_data() inline {
+(int, int, int, slice, slice, cell, cell, cell) load_data() inline {
     var ds = get_data().begin_parse();
     return (
         ds~load_coins(), ;; min burn amount
         ds~load_coins(), ;; burn storage
-        PTJ_JETTON_ID, ;; jetton id (name)
+        ds~load_uint(64), ;; jetton id (name)
         ds~load_msg_addr(), ;; owner_address
         ds~load_msg_addr(), ;; second_owner
         ds~load_ref(), ;; master_address and jetton_wallet_code
@@ -62,7 +62,7 @@
     int op = in_msg_body~load_uint(32);
     int query_id = in_msg_body~load_uint(64);
 
-    (int min_burn, int burn_storage, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+    (int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
 
     slice jetton_wallet_slice = jetton_wallet.begin_parse();
     slice jetton_master_address = jetton_wallet_slice~load_msg_addr();
@@ -116,7 +116,7 @@
         int burn_amount = muldiv(burn_factor, amount, burn_base);
 
         ;; send hurray to the campaign and to update it's balance map
-        send_hurray(sender_address, nft_address, 20000000, PTJ_JETTON_ID, net_amount, query_id);
+        send_hurray(sender_address, nft_address, 20000000, jetton_id, net_amount, query_id);
 
         ;; burn the amount
         if (burn_amount > 0) {
@@ -180,21 +180,21 @@
 
 
 (cell) get_exchange_rate() method_id {
-    (int min_burn, int burn_storage, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+    (int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
     return (exchange_rate);
 }
 
 (int, int) get_burn_details() method_id {
-    (int min_burn, int burn_storage, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+    (int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
     return (min_burn, burn_storage);
 }
 
 (cell) get_factors() method_id {
-    (int min_burn, int burn_storage, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+    (int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
     return (factors);
 }
 
 (slice, slice) get_addresses() method_id {
-    (int min_burn, int burn_storage, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+    (int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
     return (owner_address, second_owner);
 }

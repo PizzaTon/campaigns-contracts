@@ -18,11 +18,6 @@ int op::contract_upgrade() asm "0x7 PUSHINT";
 int op::update_factors() asm "0x8 PUSHINT";
 int op::update_exchange_rate() asm "0x9df10277 PUSHINT";
 
-;; NFTEditable
-int op::edit_content() asm "0x1a0b9d51 PUSHINT";
-int op::transfer_editorship() asm "0x1c04412a PUSHINT";
-int op::editorship_assigned() asm "0x511a4463 PUSHINT";
-
 ;; SBT
 int op::request_owner() asm "0xd0c3bfea PUSHINT";
 int op::owner_info() asm "0x0dd607e3 PUSHINT";
@@ -39,8 +34,6 @@ int op::take_excess() asm "0xd136d3b3 PUSHINT";
 int op::hurray() asm "0x0761e92a PUSHINT";
 int op::hurray_ton() asm "0x32f00b8a PUSHINT";
 int op::donate() asm "0x11f5b26f PUSHINT";
-int op::split_shares() asm "0x11f5b25e PUSHINT";
-int op::withdraw_donations() asm "0x11f5b24c PUSHINT";
 
 ;; Jetton opcodes
 int op::jetton_transfer() asm "0xf8a7ea5 PUSHINT";
