@@ -1,0 +1,3 @@
+const PTJ_JETTON_ID = 0;
+int gas_consumption() asm "15000000 PUSHINT"; ;; 0.015 TON
+int min_tons_for_storage() asm "10000000 PUSHINT"; ;; 0.01 TON

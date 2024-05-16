@@ -1,0 +1,90 @@
+slice to_string(int n) {
+  builder b = begin_cell();
+  tuple chars = null();
+  do {
+    int r = n~divmod(10);
+    chars = cons(r + "0"u, chars);
+  } until (n == 0);
+  do {
+    int char = chars~list_next();
+    b~store_uint(char, 8);
+  } until (null?(chars));
+  return b.end_cell().begin_parse();
+}
+
+() send_text_message(slice to_addr, int value, int mode, builder content) impure {
+    var body = begin_cell()
+      .store_uint(0, 32)
+      .store_builder(content)
+    .end_cell();
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(to_addr)
+        .store_coins(value)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+      .end_cell();
+
+    send_raw_message(msg, mode);
+
+    return ();
+}
+
+() send_msg(int flag, slice to_address, int amount, int op, int query_id, builder payload, int send_mode) impure inline {
+    var msg = begin_cell()
+            .store_uint(flag, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+            .store_slice(to_address)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op, 32)
+            .store_uint(query_id, 64);
+
+    if (~ builder_null?(payload)) {
+        msg = msg.store_builder(payload);
+    }
+
+    send_raw_message(msg.end_cell(), send_mode);
+}
+
+slice num_to_str(int decimals, int radix) {
+    builder str = begin_cell();
+    int ctr  = 0;
+    tuple chars =  empty_tuple();
+
+    do {
+        (decimals, int rem) = decimals /% radix;
+
+        chars~tpush( rem >= 10 ? 87 + rem : 48 + rem);
+        ctr += 1;
+    } until (decimals == 0);
+
+    repeat( ctr ) {
+        str     = str.store_uint(chars.at(ctr - 1), 8);
+        ctr    -= 1;
+    }
+
+    return str.end_cell().begin_parse();
+}
+
+builder concat(slice a, slice b) inline {
+    return begin_cell().store_slice(a).store_slice(b);
+}
+
+() send_hurray(slice donor, slice to, int forward_ton, int jetton_id, int jetton_amount, int query_id) impure inline {
+  builder msg = begin_cell()
+          .store_uint(0x10, 6)
+          .store_slice(to)
+          .store_coins(forward_ton)
+          .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+          .store_ref(
+            begin_cell()
+              .store_uint(op::hurray(), 32)
+              .store_uint(query_id, 64)
+              .store_uint(jetton_id, 64)
+              .store_coins(jetton_amount)
+              .store_slice(donor)
+            .end_cell()
+          );
+  send_raw_message(msg.end_cell(), 1);
+}
