@@ -1,7 +1,15 @@
-import {Address, beginCell} from "@ton/core";
+import {Address, beginCell, Cell, toNano} from "@ton/core";
 import {OperationCodes} from "./op-codes";
 
 export const Queries = {
+    codeUpgrade: (params: {newCode: Cell, data?: Cell}) => {
+        return beginCell()
+            .storeUint(OperationCodes.internal.upgradeContract, 32)
+            .storeUint(0, 64)
+            .storeRef(params.newCode)
+            .storeMaybeRef(params.data)
+            .endCell()
+    },
     mint: (params: { queryId?: number, itemOwnerAddress: Address, activeUntil?: bigint, campaignId: bigint }) => {
         return beginCell()
             .storeUint(OperationCodes.internal.campaign.mint, 32)
@@ -12,7 +20,9 @@ export const Queries = {
                     .storeUint(params.campaignId, 64)
                     .storeUint(params.activeUntil ?? 0, 64)
                     .endCell()
-            ).endCell();
+            )
+            .storeCoins(toNano('0.05')) // Pass Amount
+            .endCell();
     },
     updateOwner: (params: { queryId?: number, newOwner: Address }) => {
         return beginCell()

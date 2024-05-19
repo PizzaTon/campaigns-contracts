@@ -222,7 +222,7 @@
       (int fee_factor, int fee_base, int burn_factor, int burn_base, int min_exchange_rate, int max_exchange_rate, int pure_burn_factor, int pure_burn_base, int reward_factor, int reward_base) = (factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16), factors_slice~load_uint(16));
 
       int new_exchange_rate = muldiv(exchange_factor, 1, exchange_base);
-      throw_if(119, (new_exchange_rate < min_exchange_rate) | (new_exchange_rate > max_exchange_rate));
+      throw_if(119, (new_exchange_rate < min_exchange_rate)); ;;  | (new_exchange_rate > max_exchange_rate)
 
       accept_message();
 

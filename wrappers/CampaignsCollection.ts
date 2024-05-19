@@ -102,6 +102,17 @@ export class CampaignsCollection implements Contract {
         );
     }
 
+    async sendCodeUpgrade(provider: ContractProvider, via: Sender, newCode: Cell) {
+        let msgBody = Queries.codeUpgrade({ newCode: newCode });
+
+        return await provider.internal(via,
+            {
+                value: toNano('0.1'),
+                body: msgBody,
+            }
+        );
+    }
+
     async sendGetRoyaltyParams(provider: ContractProvider, via: Sender) {
         let msgBody = Queries.getRoyaltyParams({})
 

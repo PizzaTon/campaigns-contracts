@@ -84,13 +84,13 @@
 
     if (op == op::mint()) { ;; deploy new campaign
       cell bc = in_msg_body~load_ref();
-
       slice body = bc.begin_parse();
       slice new_owner = body~load_msg_addr();
       int campaign_id = body~load_uint(64);
       int active_until = body~load_uint(64);
+      int pass_amount = body~load_coins();
 
-      deploy_nft_item(campaign_id, nft_item_code, 100000000, begin_cell()
+      deploy_nft_item(campaign_id, nft_item_code, pass_amount, begin_cell()
             .store_slice(new_owner)
             .store_uint(active_until, 64)
             .store_int(true, 1)
