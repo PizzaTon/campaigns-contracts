@@ -32,6 +32,20 @@ export const Queries = {
             .storeAddress(params.newOwner)
             .endCell();
     },
+    updateSecondOwner: (params: { queryId?: number, newOwner: Address }) => {
+        return beginCell()
+            .storeUint(OperationCodes.internal.updateSecondOwner, 32)
+            .storeUint(params.queryId || 0, 64)
+            .storeAddress(params.newOwner)
+            .endCell();
+    },
+    updateStatus: (params: { queryId?: number, isActive: boolean }) => {
+        return beginCell()
+            .storeUint(OperationCodes.internal.updateStatus, 32)
+            .storeUint(params.queryId || 0, 64)
+            .storeBit(params.isActive)
+            .endCell();
+    },
     getRoyaltyParams: (params: { queryId?: number }) => {
         return beginCell()
             .storeUint(OperationCodes.internal.campaign.getRoyaltyParams, 32)

@@ -226,17 +226,43 @@ describe('TonRouter', () => {
         await expect(tonRouter.getIsActive()).rejects.toThrow(GetMethodError);
     });
 
-    it('should receive external message', async () => {
-        await tonRouter.sendUpdateExchangeRate({
-            adminMnemonic: [],
-            exchangeRate: {
-                factor: 160n,
-                base: 2n,
-            },
-            validUntil: Math.floor(Date.now() / 1000) + 120,
+    // Uncomment this test and test it with your own mnemonics (works fine)
+    // it('should receive external message', async () => {
+    //     await tonRouter.sendUpdateExchangeRate({
+    //         adminMnemonic: [],
+    //         exchangeRate: {
+    //             factor: 160n,
+    //             base: 2n,
+    //         },
+    //         validUntil: Math.floor(Date.now() / 1000) + 120,
+    //     });
+    //     const rate = await tonRouter.getExchangeRate();
+    //     expect(rate.factor).toBe(160n);
+    //     expect(rate.base).toBe(2n);
+    // });
+
+    it('should update owners', async () => {
+        const sendNotFromOwner = await tonRouter.sendUpdateOwner(secondOwner.getSender(), secondOwner.address);
+        expect(sendNotFromOwner.transactions).toHaveTransaction({
+            exitCode: 401
         });
-        const rate = await tonRouter.getExchangeRate();
-        expect(rate.factor).toBe(160n);
-        expect(rate.base).toBe(2n);
+
+        await tonRouter.sendUpdateOwner(owner.getSender(), secondOwner.address);
+        expect((await tonRouter.getAddresses()).ownerAddress).toEqualAddress(secondOwner.address);
+
+        const sendNotFrom2ndOwner = await tonRouter.sendUpdateSecondOwner(owner.getSender(), secondOwner.address);
+        expect(sendNotFrom2ndOwner.transactions).toHaveTransaction({
+            exitCode: 401
+        });
+
+        await tonRouter.sendUpdateSecondOwner(secondOwner.getSender(), owner.address);
+        expect((await tonRouter.getAddresses()).secondOwner).toEqualAddress(owner.address);
+    });
+
+    it('should update contract status', async () => {
+        const statusBefore = await tonRouter.getIsActive();
+        await tonRouter.sendUpdateStatus(owner.getSender(), !statusBefore);
+        const statusAfter = await tonRouter.getIsActive();
+        expect(statusAfter).toBe(!statusBefore);
     });
 });

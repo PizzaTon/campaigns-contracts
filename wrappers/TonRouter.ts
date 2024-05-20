@@ -10,7 +10,7 @@ import {
     SendMode,
     toNano,
     TupleItemCell,
-    TupleItemInt
+    TupleItemInt, TupleItemSlice
 } from '@ton/core';
 import {OperationCodes} from "../scripts/utils/op-codes";
 import {Queries} from "../scripts/utils/queries";
@@ -146,6 +146,45 @@ export class TonRouter implements Contract {
         );
     }
 
+    async sendUpdateOwner(provider: ContractProvider, via: Sender, newOwner: Address) {
+        let msgBody = Queries.updateOwner({
+            newOwner
+        });
+
+        return await provider.internal(via,
+            {
+                value: toNano('0.1'),
+                body: msgBody,
+            }
+        );
+    }
+
+    async sendUpdateSecondOwner(provider: ContractProvider, via: Sender, newOwner: Address) {
+        let msgBody = Queries.updateSecondOwner({
+            newOwner
+        });
+
+        return await provider.internal(via,
+            {
+                value: toNano('0.1'),
+                body: msgBody,
+            }
+        );
+    }
+
+    async sendUpdateStatus(provider: ContractProvider, via: Sender, isActive: boolean) {
+        let msgBody = Queries.updateStatus({
+            isActive
+        });
+
+        return await provider.internal(via,
+            {
+                value: toNano('0.1'),
+                body: msgBody,
+            }
+        );
+    }
+
     async sendUpdateExchangeRate(provider: ContractProvider, params: {
         validUntil: number,
         exchangeRate: Factor,
@@ -215,11 +254,10 @@ export class TonRouter implements Contract {
 
     async getAddresses(provider: ContractProvider) {
         const stack = (await provider.get('get_addresses', [])).stack;
-        const list = [stack.pop() as TupleItemCell, stack.pop() as TupleItemCell, stack.pop() as TupleItemCell, stack.pop() as TupleItemCell];
+        const list = [stack.pop() as TupleItemCell, stack.pop() as TupleItemCell];
         return {
             ownerAddress: list.at(0)?.cell.beginParse().loadAddress(),
             secondOwner: list.at(1)?.cell.beginParse().loadAddress(),
-            burnerAddress: list.at(2)?.cell.beginParse().loadAddress(),
         };
     }
 }

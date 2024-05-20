@@ -33,6 +33,7 @@ export const OperationCodes = {
             takeWalletAddress: 0xd1735400,
             updateContent: 0x4,
         },
+        updateStatus: 0xA,
         updateOwner: 0x3,
         changeContent: 0x4,
         withdrawBalance: 0x5,
