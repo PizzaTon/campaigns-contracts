@@ -1,5 +1,5 @@
 import { Address, toNano } from '@ton/core';
-import { CampaignsCollection, routersDictionaryValue } from '../wrappers/CampaignsCollection';
+import { CampaignsCollection } from '../wrappers/CampaignsCollection';
 import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {

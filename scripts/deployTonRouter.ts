@@ -7,6 +7,8 @@ export async function run(provider: NetworkProvider) {
     const minter = Address.parse("kQAGs82fyuPTvolTdKHWfutaoi7NGN71C4TvoHJ0D48Pwrip");
 
     const tonRouter = provider.open(TonRouter.createFromConfig({
+        jettonBalance: toNano('1000'),
+        isActive: true,
         publicKey: Buffer.from('e395c7331d79b85a718c25ac97163ed254c5b416e14a89d9568027fa69a19b5f', 'hex'),
         owner: sender,
         secondOwner: sender,

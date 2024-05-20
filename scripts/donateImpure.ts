@@ -9,7 +9,7 @@ export async function run(provider: NetworkProvider) {
 
   const tonRouter = provider.open(TonRouter.createFromAddress(tonRouterAddress));
 
-  await tonRouter.sendDonate(provider.sender(), toNano('1'), {
+  await tonRouter.sendDonate(provider.sender(), toNano('5'), {
     campaignAddress: campaignAddress,
     isPure: false
   });

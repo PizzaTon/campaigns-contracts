@@ -16,6 +16,8 @@ int op::withdraw_balance() asm "0x5 PUSHINT";
 int op::update_second_owner() asm "0x6 PUSHINT";
 int op::contract_upgrade() asm "0x7 PUSHINT";
 int op::update_factors() asm "0x8 PUSHINT";
+int op::withdraw_jetton_balance() asm "0x9 PUSHINT";
+int op::update_contract_status() asm "0xA PUSHINT";
 int op::update_exchange_rate() asm "0x9df10277 PUSHINT";
 
 ;; SBT

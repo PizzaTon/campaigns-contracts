@@ -166,7 +166,7 @@
     if (op == op::contract_upgrade()) { ;; update collection's code & data
       set_code(in_msg_body~load_ref());
       cell data = in_msg_body~load_maybe_ref();
-      if(~ cell_null?(data)) {
+      ifnot data.null?() {
         set_data(data);
       }
       return ();

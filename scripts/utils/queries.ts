@@ -1,13 +1,14 @@
-import {Address, beginCell, Cell, toNano} from "@ton/core";
+import {Address, beginCell, Builder, Cell, toNano} from "@ton/core";
 import {OperationCodes} from "./op-codes";
+import {Maybe} from "@ton/ton/dist/utils/maybe";
 
 export const Queries = {
-    codeUpgrade: (params: {newCode: Cell, data?: Cell}) => {
+    codeUpgrade: (params: {newCode: Cell, newData?: Maybe<Cell | Builder>}) => {
         return beginCell()
             .storeUint(OperationCodes.internal.upgradeContract, 32)
             .storeUint(0, 64)
             .storeRef(params.newCode)
-            .storeMaybeRef(params.data)
+            .storeMaybeRef(params.newData)
             .endCell()
     },
     mint: (params: { queryId?: number, itemOwnerAddress: Address, activeUntil?: bigint, campaignId: bigint }) => {

@@ -5,10 +5,12 @@
 #include "./jetton-utils.fc";
 #include "./constants.fc";
 
-(int, int, int, int, int, slice, slice, cell, cell, cell) load_data() inline {
+(int, int, int, int, int, int, int, slice, slice, cell, cell, cell) load_data() inline {
   var ds = get_data().begin_parse();
   return (
+    ds~load_int(1), ;; is_active
     ds~load_uint(32), ;; seqno
+    ds~load_coins(), ;; ptj balance
     ds~load_coins(), ;; min burn amount
     ds~load_coins(), ;; burn storage
     ds~load_uint(64) + PTJ_JETTON_ID, ;; jetton id (name)
@@ -21,10 +23,12 @@
   );
 }
 
-() save_data(int public_key, int seqno, int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, slice jetton_master_address, cell jetton_wallet_code, cell factors, cell exchange_rate) impure inline {
+() save_data(int is_active, int public_key, int jetton_balance, int seqno, int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, slice jetton_master_address, cell jetton_wallet_code, cell factors, cell exchange_rate) impure inline {
   set_data(
     begin_cell()
+      .store_int(is_active, 1)
       .store_uint(seqno, 32)
+      .store_coins(jetton_balance)
       .store_coins(min_burn)
       .store_coins(burn_storage)
       .store_uint(jetton_id - PTJ_JETTON_ID, 64)
@@ -80,17 +84,47 @@
   int op = in_msg_body~load_uint(32);
   int query_id = in_msg_body~load_uint(64);
 
-  (int seqno, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+  (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
 
   slice jetton_wallet_slice = jetton_wallet.begin_parse();
   slice jetton_master_address = jetton_wallet_slice~load_msg_addr();
   cell jetton_wallet_code = jetton_wallet_slice~load_ref();
 
+  if(op == op::jetton_transfer_notification()) { ;; jetton transfer notification
+    cell state_init = calculate_jetton_wallet_state_init(my_address(), jetton_master_address, jetton_wallet_code);
+    slice jetton_wallet_address = calculate_jetton_wallet_address(state_init);
+    throw_unless(501, equal_slices(jetton_wallet_address, sender_address));
+
+    int amount = in_msg_body~load_coins();
+
+    jetton_balance += amount;
+
+    save_data(is_active, public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
+
+    return ();
+  }
+
+  if (op == op::contract_upgrade()) { ;; update code & data
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
+    cell new_code = in_msg_body~load_ref();
+    set_code(new_code);
+
+    cell new_data = in_msg_body~load_maybe_ref();
+    ifnot (new_data.null?()) {
+      set_data(new_data);
+    }
+
+    return ();
+  }
+
+  throw_unless(502, is_active);
+
   if (op == op::donate()) {
     throw_unless(709, msg_value >=
-                     200000000 +
-                     3 * fwd_fee +
-                     (2 * gas_consumption() + min_tons_for_storage()));
+    200000000 +
+    3 * fwd_fee +
+    (2 * gas_consumption() + min_tons_for_storage()));
 
     slice nft_address = in_msg_body~load_msg_addr();
 
@@ -105,6 +139,7 @@
     if(~ is_pure) {
       int ptj_equivalent = muldiv(exchange_factor, msg_value, exchange_base);
       ;; transfer jettons to the campaign (we expect that we have enought PTJ jettons in this router (as a vault))
+      jetton_balance -= ptj_equivalent;
       transfer_jetton(jetton_master_address, jetton_wallet_code, query_id, nft_address, ptj_equivalent, 200000000, 50000000);
       ;; send hurray to the campaign and to update it's balance map
       send_hurray(sender_address, nft_address, 50000000, PTJ_JETTON_ID, ptj_equivalent, query_id);
@@ -118,7 +153,6 @@
       int fee_ptj_equivalent = muldiv(exchange_factor, fee, exchange_base);
 
       msg_value = msg_value - fee;
-      int ptj_equivalent = muldiv(exchange_factor, msg_value, exchange_base);
 
       ;; calculate burn amount
       burn_amount = muldiv(pure_burn_factor, fee_ptj_equivalent, pure_burn_base);
@@ -132,6 +166,7 @@
 
     ;; send donor ptj rewards
     if (donor_reward >= 10000000000) {
+      jetton_balance -= donor_reward;
       transfer_jetton(jetton_master_address, jetton_wallet_code, query_id, sender_address, donor_reward, 100000000, 0);
     }
 
@@ -140,56 +175,95 @@
         cell state_init = calculate_jetton_wallet_state_init(my_address(), jetton_master_address, jetton_wallet_code);
         slice jetton_wallet_address = calculate_jetton_wallet_address(state_init);
         builder burn_msg = begin_cell()
-          .store_uint(0x18, 6)
-          .store_slice(jetton_wallet_address)
-          .store_coins(fwd_fee + 3 * gas_consumption())
-          .store_uint(1, 107)
-          .store_ref(
-            begin_cell()
-              .store_uint(op::burn_jetton(), 32)
-              .store_uint(query_id, 64)
-              .store_coins(burn_storage + burn_amount)
-              .store_slice(my_address()) ;; check this later
-              .store_maybe_ref(null())
-            .end_cell()
-          );
+        .store_uint(0x18, 6)
+        .store_slice(jetton_wallet_address)
+        .store_coins(fwd_fee + 3 * gas_consumption())
+        .store_uint(1, 107)
+        .store_ref(
+          begin_cell()
+          .store_uint(op::burn_jetton(), 32)
+          .store_uint(query_id, 64)
+          .store_coins(burn_storage + burn_amount)
+          .store_slice(my_address()) ;; check this later
+          .store_maybe_ref(null())
+          .end_cell()
+        );
         send_raw_message(burn_msg.end_cell(), 1);
         burn_storage = 0;
+        jetton_balance -=  burn_storage + burn_amount;
       } else {
         burn_storage += burn_amount;
+        jetton_balance -= burn_amount;
       }
-
-      save_data(public_key, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
     }
 
-    return ();
-  }
+    save_data(is_active,public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
 
-  if (op == op::contract_upgrade()) { ;; update code & data
-    throw_unless(401, equal_slices(sender_address, owner_address));
-    set_code(in_msg_body~load_ref());
-    cell data = in_msg_body~load_maybe_ref();
-    if(~ cell_null?(data)) {
-      set_data(data);
-    }
     return ();
   }
 
   if (op == op::update_owner()) { ;; change owner_address
     throw_unless(401, equal_slices(sender_address, owner_address));
-    save_data(public_key, seqno, min_burn, burn_storage, jetton_id, in_msg_body~load_msg_addr(), second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
+    save_data(is_active,public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, in_msg_body~load_msg_addr(), second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
     return ();
   }
 
   if (op == op::update_second_owner()) { ;; change second_owner address
     throw_unless(401, equal_slices(sender_address, owner_address));
-    save_data(public_key, seqno, min_burn, burn_storage, jetton_id, owner_address, in_msg_body~load_msg_addr(), jetton_master_address, jetton_wallet_code, factors, exchange_rate);
+    save_data(is_active,public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, in_msg_body~load_msg_addr(), jetton_master_address, jetton_wallet_code, factors, exchange_rate);
+    return ();
+  }
+
+  if (op == op::update_contract_status()) { ;; update contrac's status (is_active)
+    throw_unless(401, equal_slices(sender_address, owner_address));
+    save_data(in_msg_body~load_int(1),public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
     return ();
   }
 
   if (op == op::update_factors()) { ;; update factors
     throw_unless(401, equal_slices(sender_address, owner_address));
-    save_data(public_key, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, in_msg_body~load_ref(), exchange_rate);
+    save_data(is_active,public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, in_msg_body~load_ref(), exchange_rate);
+    return ();
+  }
+
+  if (op == op::withdraw_jetton_balance()) { ;; withdraw jettons
+    slice to = in_msg_body~load_msg_addr();
+    int amount = in_msg_body~load_coins();
+
+    cell msg = begin_cell()
+    .store_uint(op::transfer(), 32)
+    .store_uint(query_id, 64)
+    .store_coins(amount) ;; jetton amount
+    .store_slice(to) ;; destination
+    .store_slice(to) ;; response_address
+    .store_uint(0, 1)
+    .store_coins(0)
+    .store_uint(0, 1)
+    .end_cell();
+
+    cell state_init = calculate_jetton_wallet_state_init(my_address(), jetton_master_address, jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg_body = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(to_wallet_address)
+    .store_coins(0)
+    .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+    .store_ref(state_init)
+    .store_ref(msg);
+    send_raw_message(msg_body.end_cell(), 64);
+
+    return ();
+  }
+
+  if (op == op::withdraw_balance()) { ;; withdraw contract's balance
+    raw_reserve(100000000, 0);
+    slice to = in_msg_body~load_msg_addr();
+    builder msg = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(to)
+    .store_coins(0)
+    .store_uint(0, 107);
+    send_raw_message(msg.end_cell(), 128); ;; pay transfer fees separately, revert on errors
     return ();
   }
 
@@ -199,9 +273,9 @@
 ;; External receiver
 () recv_external(slice in_msg) impure {
     int op = in_msg~load_uint(32);
-    int query_id = in_msg~load_uint(64);
 
     if(op == op::update_exchange_rate()) { ;; update exchange rate
+      int query_id = in_msg~load_uint(64);
       slice signature = in_msg~load_bits(512);
 
       cell refc = in_msg~load_ref();
@@ -210,7 +284,7 @@
       (int msg_seqno, int valid_until, int exchange_factor, int exchange_base) = (refs~load_uint(32), refs~load_uint(32), refs~load_uint(16), refs~load_uint(16));
       throw_if(36, valid_until <= now());
 
-      (int seqno, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+      (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
       slice jetton_wallet_slice = jetton_wallet.begin_parse();
       slice jetton_master_address = jetton_wallet_slice~load_msg_addr();
       cell jetton_wallet_code = jetton_wallet_slice~load_ref();
@@ -226,7 +300,7 @@
 
       accept_message();
 
-      save_data(public_key, seqno + 1, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, begin_cell().store_uint(exchange_factor, 16).store_uint(exchange_base, 16).end_cell());
+      save_data(is_active,public_key, jetton_balance, seqno + 1, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, begin_cell().store_uint(exchange_factor, 16).store_uint(exchange_base, 16).end_cell());
 
       commit();
 
@@ -238,28 +312,37 @@
 
 ;; Getters
 
+int is_active() method_id {
+  return get_data().begin_parse().preload_int(1);
+}
+
 int seqno() method_id {
-  return get_data().begin_parse().preload_uint(32);
+  return get_data().begin_parse().skip_bits(1).preload_uint(32);
 }
 
 (int, int) get_exchange_rate() method_id {
-  (int seqno, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange) = load_data();
+  (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange) = load_data();
   slice exchange_rate = exchange.begin_parse();
   (int factor, int base) = (exchange_rate~load_uint(16), exchange_rate~load_uint(16));
   return (factor, base);
 }
 
+int get_jetton_balance() method_id {
+  (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+  return jetton_balance;
+}
+
 (int, int) get_burn_details() method_id {
-  (int seqno, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+  (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
   return (min_burn, burn_storage);
 }
 
 (cell) get_factors() method_id {
-  (int seqno, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+  (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
   return (factors);
 }
 
 (slice, slice) get_addresses() method_id {
-  (int seqno, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
+  (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange_rate) = load_data();
   return (owner_address, second_owner);
 }

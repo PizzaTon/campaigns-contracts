@@ -1,8 +1,8 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import {Address, Cell, toNano} from '@ton/core';
-import { TonRouter } from '../wrappers/TonRouter';
+import {Blockchain, GetMethodError, printTransactionFees, SandboxContract, TreasuryContract} from '@ton/sandbox';
+import {Address, beginCell, Cell, toNano} from '@ton/core';
+import {TonRouter, tonRouterConfigToCell} from '../wrappers/TonRouter';
 import '@ton/test-utils';
-import { compile } from '@ton/blueprint';
+import {compile} from '@ton/blueprint';
 import {CampaignsCollection} from "../wrappers/CampaignsCollection";
 import {JettonMinter} from "../wrappers/JettonMinter";
 import {encodeOffChainContent} from "../scripts/utils/nft";
@@ -81,6 +81,8 @@ describe('TonRouter', () => {
         await minterContract.sendDeploy(deployer.getSender(), toNano('0.1'));
 
         tonRouter = blockchain.openContract(TonRouter.createFromConfig({
+            isActive: true,
+            jettonBalance: 0n,
             publicKey: Buffer.from('e395c7331d79b85a718c25ac97163ed254c5b416e14a89d9568027fa69a19b5f', 'hex'),
             owner: owner.address,
             secondOwner: secondOwner.address,
@@ -128,5 +130,113 @@ describe('TonRouter', () => {
     it('should deploy', async () => {
         // the check is done inside beforeEach
         // blockchain and tonRouter are ready to use
+    });
+
+    it('should upgrade the code and data', async () => {
+        // Send from an unknown sender (not owner)
+        const sendNotFromOwner = await tonRouter.sendCodeUpgrade(secondOwner.getSender(), {
+            newCode: beginCell().endCell()
+        });
+        expect(sendNotFromOwner.transactions).toHaveTransaction({
+            exitCode: 401
+        });
+
+        // Change Only Data
+        await tonRouter.sendCodeUpgrade(owner.getSender(), {
+            newCode: code,
+            newData: tonRouterConfigToCell({
+                jettonBalance: toNano('0'), // Change for test
+                isActive: false, // Change for test
+                publicKey: Buffer.from('e395c7331d79b85a718c25ac97163ed254c5b416e14a89d9568027fa69a19b5f', 'hex'),
+                owner: owner.address,
+                secondOwner: secondOwner.address,
+                jettonMasterAddress: minterContract.address,
+                jettonWalletCode: walletCode,
+                factors: {
+                    pureBurn: {
+                        factor: 5n,
+                        base: 10n,
+                    },
+                    burn: {
+                        factor: 5n,
+                        base: 10n,
+                    },
+                    fee: {
+                        factor: 1n,
+                        base: 10n,
+                    },
+                    exchangeRate: {
+                        min: 50n,
+                        max: 100n,
+                    },
+                    reward: {
+                        factor: 2n,
+                        base: 10n,
+                    }
+                },
+                exchangeRate: {
+                    factor: 80n,
+                    base: 1n
+                },
+                minBurn: toNano('1000')
+            })
+        });
+        expect(await tonRouter.getIsActive()).toBe(false);
+
+        // Change the code
+        await tonRouter.sendCodeUpgrade(owner.getSender(), {
+            newCode: minterCode,
+            newData: tonRouterConfigToCell({
+                jettonBalance: toNano('0'), // Change for test
+                isActive: false, // Change for test
+                publicKey: Buffer.from('e395c7331d79b85a718c25ac97163ed254c5b416e14a89d9568027fa69a19b5f', 'hex'),
+                owner: owner.address,
+                secondOwner: secondOwner.address,
+                jettonMasterAddress: minterContract.address,
+                jettonWalletCode: walletCode,
+                factors: {
+                    pureBurn: {
+                        factor: 5n,
+                        base: 10n,
+                    },
+                    burn: {
+                        factor: 5n,
+                        base: 10n,
+                    },
+                    fee: {
+                        factor: 1n,
+                        base: 10n,
+                    },
+                    exchangeRate: {
+                        min: 50n,
+                        max: 100n,
+                    },
+                    reward: {
+                        factor: 2n,
+                        base: 10n,
+                    }
+                },
+                exchangeRate: {
+                    factor: 80n,
+                    base: 1n
+                },
+                minBurn: toNano('1000')
+            })
+        });
+        await expect(tonRouter.getIsActive()).rejects.toThrow(GetMethodError);
+    });
+
+    it('should receive external message', async () => {
+        await tonRouter.sendUpdateExchangeRate({
+            adminMnemonic: [],
+            exchangeRate: {
+                factor: 160n,
+                base: 2n,
+            },
+            validUntil: Math.floor(Date.now() / 1000) + 120,
+        });
+        const rate = await tonRouter.getExchangeRate();
+        expect(rate.factor).toBe(160n);
+        expect(rate.base).toBe(2n);
     });
 });
