@@ -133,7 +133,7 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
         return ();
     }
     if (op == op::destroy()) {
-        throw_unless(401, equal_slices(sender_address, owner_address) | equal_slices(sender_address, collection_address));
+        throw_unless(401, equal_slices(sender_address, collection_address));
 
         send_msg(flag::regular(), sender_address, 0, op::excesses(), query_id, null(), 128);
 
