@@ -96,7 +96,7 @@
             .store_int(true, 1)
             .store_dict(routers)
             .end_cell());
-      save_data(owner_address, campaign_id, content, nft_item_code, royalty_params, second_owner_address, routers);
+      save_data(owner_address, next_item_index + 1, content, nft_item_code, royalty_params, second_owner_address, routers);
       return ();
     }
 
@@ -126,8 +126,29 @@
             .end_cell());
         }
       } until ( ~ f?);
-      save_data(owner_address, next_item_index, content, nft_item_code, royalty_params, second_owner_address, routers);
+      save_data(owner_address, next_item_index + counter, content, nft_item_code, royalty_params, second_owner_address, routers);
       return ();
+    }
+
+    if (op == op::upgrade_routers()) {
+        slice nft_to_upgrade = in_msg_body~load_msg_addr();
+        builder msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(nft_to_upgrade)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(
+            begin_cell()
+            .store_uint(op::upgrade_routers(), 32)
+            .store_uint(query_id, 64)
+            .store_slice(sender_address)
+            .store_ref(routers)
+            .end_cell()
+        );
+
+        send_raw_message(msg.end_cell(), 64);
+
+        return ();
     }
 
     ;; handle owner/admin messages
@@ -164,12 +185,15 @@
     }
 
     if (op == op::contract_upgrade()) { ;; update collection's code & data
-      set_code(in_msg_body~load_ref());
-      cell data = in_msg_body~load_maybe_ref();
-      ifnot data.null?() {
-        set_data(data);
-      }
-      return ();
+        cell new_code = in_msg_body~load_ref();
+        set_code(new_code);
+
+        cell new_data = in_msg_body~load_maybe_ref();
+        ifnot (new_data.null?()) {
+            set_data(new_data);
+        }
+
+        return ();
     }
 
     if (op == op::close_campaign()) { ;; close a specefic campaign

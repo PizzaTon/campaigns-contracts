@@ -1,6 +1,6 @@
 import {
     Address,
-    beginCell,
+    beginCell, Builder,
     Cell,
     Contract,
     contractAddress,
@@ -11,6 +11,7 @@ import {
 } from '@ton/core';
 import {encodeOffChainContent} from "../scripts/utils/nft";
 import {Queries} from "../scripts/utils/queries";
+import {Maybe} from "@ton/ton/dist/utils/maybe";
 
 export type RoyaltyParams = {
     factor: bigint;
@@ -102,8 +103,8 @@ export class CampaignsCollection implements Contract {
         );
     }
 
-    async sendCodeUpgrade(provider: ContractProvider, via: Sender, newCode: Cell) {
-        let msgBody = Queries.codeUpgrade({ newCode: newCode });
+    async sendCodeUpgrade(provider: ContractProvider, via: Sender, params: {newCode: Cell, newData?: Maybe<Cell | Builder>}) {
+        let msgBody = Queries.codeUpgrade(params);
 
         return await provider.internal(via,
             {

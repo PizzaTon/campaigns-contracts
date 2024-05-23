@@ -47,3 +47,4 @@ int op::close_campaign() asm "0x11f5b38a PUSHINT";
 int op::open_campaign() asm "0x11f5b49b PUSHINT";
 int op::add_router() asm "0x11f5b60a PUSHINT";
 int op::del_router() asm "0x11f5b61b PUSHINT";
+int op::upgrade_routers() asm "0x11f5b62c PUSHINT";

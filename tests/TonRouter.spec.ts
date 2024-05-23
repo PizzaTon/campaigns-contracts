@@ -1,5 +1,5 @@
 import {Blockchain, GetMethodError, printTransactionFees, SandboxContract, TreasuryContract} from '@ton/sandbox';
-import {Address, beginCell, Cell, toNano} from '@ton/core';
+import {Address, beginCell, Cell, fromNano, toNano} from '@ton/core';
 import {TonRouter, tonRouterConfigToCell} from '../wrappers/TonRouter';
 import '@ton/test-utils';
 import {compile} from '@ton/blueprint';

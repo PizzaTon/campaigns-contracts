@@ -303,11 +303,26 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
     }
     if (op == op::contract_upgrade()) {
         throw_unless(401, equal_slices(sender_address, collection_address));
-        set_code(in_msg_body~load_ref());
-        cell data = in_msg_body~load_maybe_ref();
-        if(~ cell_null?(data)) {
-            set_data(data);
+
+        cell new_code = in_msg_body~load_ref();
+        set_code(new_code);
+
+        cell new_data = in_msg_body~load_maybe_ref();
+        ifnot (new_data.null?()) {
+            set_data(new_data);
         }
+
+        return ();
+    }
+
+    if (op == op::upgrade_routers()) { ;; upgrade_routers
+        throw_unless(401, equal_slices(sender_address, collection_address));
+        slice real_owner = in_msg_body~load_msg_addr();
+        throw_unless(402, equal_slices(real_owner, owner_address));
+
+        cell new_routers = in_msg_body~load_ref();
+
+        store_data(index, collection_address, owner_address, content, revoked_at, active_until, status, new_routers, balances);
         return ();
     }
 

@@ -227,6 +227,8 @@
   }
 
   if (op == op::withdraw_jetton_balance()) { ;; withdraw jettons
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
     slice to = in_msg_body~load_msg_addr();
     int amount = in_msg_body~load_coins();
 
@@ -256,6 +258,8 @@
   }
 
   if (op == op::withdraw_balance()) { ;; withdraw contract's balance
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
     raw_reserve(100000000, 0);
     slice to = in_msg_body~load_msg_addr();
     builder msg = begin_cell()
@@ -318,6 +322,11 @@ int is_active() method_id {
 
 int seqno() method_id {
   return get_data().begin_parse().skip_bits(1).preload_uint(32);
+}
+
+int jetton_id() method_id {
+  (int is_active, int seqno, int jetton_balance, int min_burn, int burn_storage, int jetton_id, int public_key, slice owner_address, slice second_owner, cell jetton_wallet, cell factors, cell exchange) = load_data();
+  return jetton_id;
 }
 
 (int, int) get_exchange_rate() method_id {
