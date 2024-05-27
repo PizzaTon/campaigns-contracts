@@ -18,6 +18,9 @@ int op::contract_upgrade() asm "0x7 PUSHINT";
 int op::update_factors() asm "0x8 PUSHINT";
 int op::withdraw_jetton_balance() asm "0x9 PUSHINT";
 int op::update_contract_status() asm "0xA PUSHINT";
+int op::upgrade_another_contract() asm "0xB PUSHINT";
+int op::update_public_key() asm "0xC PUSHINT";
+int op::update_burn_deatils() asm "0xD PUSHINT";
 int op::update_exchange_rate() asm "0x9df10277 PUSHINT";
 
 ;; SBT

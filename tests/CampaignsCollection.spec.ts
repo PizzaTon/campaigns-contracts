@@ -73,6 +73,7 @@ describe('CampaignsCollection', () => {
         let itemIndex = collectionConfig.nextItemIndex;
 
         let res = await collection.sendDeployNewNft(owner.getSender(), toNano('0.1'), {
+            passAmount: toNano('0.05'),
             campaignId: 2n,
             itemOwnerAddress: owner.address,
         });

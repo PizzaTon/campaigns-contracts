@@ -11,7 +11,7 @@ export const Queries = {
             .storeMaybeRef(params.newData)
             .endCell()
     },
-    mint: (params: { queryId?: number, itemOwnerAddress: Address, activeUntil?: bigint, campaignId: bigint }) => {
+    mint: (params: { queryId?: number, itemOwnerAddress: Address, activeUntil?: bigint, passAmount: bigint, campaignId: bigint }) => {
         return beginCell()
             .storeUint(OperationCodes.internal.campaign.mint, 32)
             .storeUint(params.queryId || 0, 64)
@@ -20,6 +20,7 @@ export const Queries = {
                     .storeAddress(params.itemOwnerAddress)
                     .storeUint(params.campaignId, 64)
                     .storeUint(params.activeUntil ?? 0, 64)
+                    .storeCoins(params.passAmount)
                     .endCell()
             )
             .storeCoins(toNano('0.05')) // Pass Amount

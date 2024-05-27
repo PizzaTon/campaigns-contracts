@@ -68,7 +68,7 @@
     cell jetton_wallet_code = jetton_wallet_slice~load_ref();
 
     if (op == op::jetton_transfer_notification()) {
-        throw_unless(502, is_active);
+        throw_unless(502, is_active); ;; anyway
 
         ;; jetton transfer notification
         cell state_init = calculate_jetton_wallet_state_init(my_address(), jetton_master_address, jetton_wallet_code);
@@ -79,7 +79,7 @@
         slice from_address = in_msg_body~load_msg_addr();
         cell forward_payload = in_msg_body~load_maybe_ref();
 
-        throw_unless(709, msg_value >= 80000000);
+        throw_unless(709, msg_value >= 150000000);
         throw_if(502, forward_payload.null?());
 
         slice payload = forward_payload.begin_parse();
@@ -104,17 +104,17 @@
         .store_slice(nft_address) ;; destination
         .store_slice(from_address) ;; response_address (maybe replace with from_address)
         .store_uint(0, 1)
-        .store_coins(0)
+        .store_coins(60000000)
         .store_uint(0, 1)
         .end_cell();
         var msg_body = begin_cell()
         .store_uint(0x18, 6)
         .store_slice(jetton_wallet_address)
-        .store_coins(50000000)
+        .store_coins(130000000)
         .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
         .store_ref(state_init)
         .store_ref(msg);
-        send_raw_message(msg_body.end_cell(), 0);
+        send_raw_message(msg_body.end_cell(), 1);
         ;; calculate burn amount
         int burn_amount = muldiv(burn_factor, amount, burn_base);
 
@@ -123,7 +123,6 @@
 
         ;; burn the amount
         if (burn_amount > 0) {
-
             if (burn_storage + burn_amount >= min_burn) {
                 builder burn_msg = begin_cell()
                 .store_uint(0x18, 6)
@@ -150,6 +149,12 @@
 
         return ();
     }
+
+    if (op == op::excesses()) {
+        return (); ;; just accept exccesses
+    }
+
+    ;; admin commands
 
     throw_unless(401, equal_slices(sender_address, owner_address));
 
@@ -226,10 +231,23 @@
         return ();
     }
 
+    if (op == op::update_burn_deatils()) {
+        save_data(is_active, in_msg_body~load_coins(), burn_storage, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors);
+        return ();
+    }
+
     throw(0xffff);
 }
 
 ;; Getters
+
+int is_active() method_id {
+    return get_data().begin_parse().preload_int(1);
+}
+
+int jetton_id() method_id {
+    return PTJ_JETTON_ID;
+}
 
 (int, int) get_burn_details() method_id {
     (int is_active, int min_burn, int burn_storage, int jetton_id, slice owner_address, slice second_owner, cell jetton_wallet, cell factors) = load_data();

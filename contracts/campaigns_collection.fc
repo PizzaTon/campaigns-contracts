@@ -154,6 +154,29 @@
     ;; handle owner/admin messages
     throw_unless(401, equal_slices(sender_address, owner_address));
 
+    if (op == op::upgrade_another_contract()) {
+        slice nft_to_upgrade = in_msg_body~load_msg_addr();
+        cell code = in_msg_body~load_ref();
+        cell data = in_msg_body~load_maybe_ref();
+        builder msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(nft_to_upgrade)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(
+            begin_cell()
+            .store_uint(op::contract_upgrade(), 32)
+            .store_uint(query_id, 64)
+            .store_ref(code)
+            .store_maybe_ref(data)
+            .end_cell()
+        );
+
+        send_raw_message(msg.end_cell(), 64);
+
+        return ();
+    }
+
     if (op == op::update_owner()) { ;; change main owner
       slice new_owner = in_msg_body~load_msg_addr();
       ;; also change second owner address if owner change

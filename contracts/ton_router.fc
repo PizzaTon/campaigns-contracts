@@ -104,23 +104,13 @@
     return ();
   }
 
-  if (op == op::contract_upgrade()) { ;; update code & data
-    throw_unless(401, equal_slices(sender_address, owner_address));
-
-    cell new_code = in_msg_body~load_ref();
-    set_code(new_code);
-
-    cell new_data = in_msg_body~load_maybe_ref();
-    ifnot (new_data.null?()) {
-      set_data(new_data);
-    }
-
-    return ();
+  if (op == op::excesses()) {
+    return (); ;; just accept exccesses
   }
 
-  throw_unless(502, is_active);
-
   if (op == op::donate()) {
+    throw_unless(502, is_active);
+
     throw_unless(709, msg_value >=
     200000000 +
     3 * fwd_fee +
@@ -202,6 +192,20 @@
     return ();
   }
 
+  if (op == op::contract_upgrade()) { ;; update code & data
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
+    cell new_code = in_msg_body~load_ref();
+    set_code(new_code);
+
+    cell new_data = in_msg_body~load_maybe_ref();
+    ifnot (new_data.null?()) {
+      set_data(new_data);
+    }
+
+    return ();
+  }
+
   if (op == op::update_owner()) { ;; change owner_address
     throw_unless(401, equal_slices(sender_address, owner_address));
     save_data(is_active,public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, in_msg_body~load_msg_addr(), second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
@@ -215,13 +219,13 @@
   }
 
   if (op == op::update_contract_status()) { ;; update contrac's status (is_active)
-    throw_unless(401, equal_slices(sender_address, owner_address));
+    throw_unless(401, equal_slices(sender_address, owner_address) | equal_slices(sender_address, second_owner));
     save_data(in_msg_body~load_int(1),public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
     return ();
   }
 
   if (op == op::update_factors()) { ;; update factors
-    throw_unless(401, equal_slices(sender_address, owner_address));
+    throw_unless(401, equal_slices(sender_address, owner_address) | equal_slices(sender_address, second_owner));
     save_data(is_active,public_key, jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, in_msg_body~load_ref(), exchange_rate);
     return ();
   }
@@ -268,6 +272,18 @@
     .store_coins(0)
     .store_uint(0, 107);
     send_raw_message(msg.end_cell(), 128); ;; pay transfer fees separately, revert on errors
+    return ();
+  }
+
+  if (op == op::update_public_key()) {
+    throw_unless(401, equal_slices(sender_address, owner_address));
+    save_data(is_active,in_msg_body~load_uint(256), jetton_balance, seqno, min_burn, burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
+    return ();
+  }
+
+  if (op == op::update_burn_deatils()) {
+    throw_unless(401, equal_slices(sender_address, owner_address) | equal_slices(sender_address, second_owner));
+    save_data(is_active,public_key, jetton_balance, seqno, in_msg_body~load_coins(), burn_storage, jetton_id, owner_address, second_owner, jetton_master_address, jetton_wallet_code, factors, exchange_rate);
     return ();
   }
 

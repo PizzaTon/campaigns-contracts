@@ -82,7 +82,7 @@ export class PtjRouter implements Contract {
 
         return await provider.internal(via,
             {
-                value: toNano('0.1'),
+                value: toNano('0.01'),
                 body: msgBody,
             }
         );

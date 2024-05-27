@@ -30,7 +30,6 @@ export type CampaignsCollectionConfig = {
     owner: Address;
     secondOwner: Address;
     nextItemIndex: bigint;
-    price: bigint;
     collectionContent: string;
     commonContent: string;
     nftItemCode: Cell;
@@ -82,7 +81,7 @@ export class CampaignsCollection implements Contract {
         });
     }
 
-    async sendDeployNewNft(provider: ContractProvider, via: Sender, value: bigint, params: { queryId?: number, itemOwnerAddress: Address, campaignId: bigint }) {
+    async sendDeployNewNft(provider: ContractProvider, via: Sender, value: bigint, params: { queryId?: number, passAmount: bigint, itemOwnerAddress: Address, campaignId: bigint }) {
         let msgBody = Queries.mint(params);
 
         await provider.internal(via, {
@@ -97,6 +96,18 @@ export class CampaignsCollection implements Contract {
         return await provider.internal(via,
             {
                 value: toNano(1),
+                bounce: false,
+                body: msgBody,
+            }
+        );
+    }
+
+    async sendChangeSecondOwner(provider: ContractProvider, via: Sender, newOwner: Address) {
+        let msgBody = Queries.updateSecondOwner({ newOwner });
+
+        return await provider.internal(via,
+            {
+                value: toNano('0.02'),
                 bounce: false,
                 body: msgBody,
             }

@@ -1,13 +1,15 @@
 import {Blockchain, printTransactionFees, SandboxContract, TreasuryContract} from '@ton/sandbox';
-import {Address, beginCell, Cell, toNano} from '@ton/core';
+import {Address, beginCell, Cell, Dictionary, toNano} from '@ton/core';
 import {PtjRouter} from '../wrappers/PtjRouter';
 import '@ton/test-utils';
 import {compile} from '@ton/blueprint';
 import {JettonMinter} from "../wrappers/JettonMinter";
-import {CampaignsCollection} from "../wrappers/CampaignsCollection";
+import {CampaignsCollection, CampaignsCollectionConfig} from "../wrappers/CampaignsCollection";
 import {encodeOffChainContent} from "../scripts/utils/nft";
 import {JettonWallet} from "../wrappers/JettonWallet";
 import {randomAddress} from "@ton/test-utils";
+import {bufferToBigUint256, routersDictionaryValue} from "../scripts/utils/helper";
+import {Campaign} from "../wrappers/Campaign";
 
 describe('PtjRouter', () => {
     let code: Cell;
@@ -36,6 +38,8 @@ describe('PtjRouter', () => {
     let ptjRouter: SandboxContract<PtjRouter>;
     let minterContract: SandboxContract<JettonMinter>;
     let collection: SandboxContract<CampaignsCollection>;
+
+    let collectionConfig: CampaignsCollectionConfig;
 
     function mapAddressToName(address?: Address) {
         if (!address) {
@@ -105,7 +109,7 @@ describe('PtjRouter', () => {
 
         deployer = await blockchain.treasury('deployer');
 
-        const deployResult = await ptjRouter.sendDeploy(deployer.getSender(), toNano('0.05'));
+        const deployResult = await ptjRouter.sendDeploy(deployer.getSender(), toNano('0.1'));
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
@@ -113,6 +117,25 @@ describe('PtjRouter', () => {
             deploy: true,
             success: true,
         });
+
+        const routersDict = Dictionary.empty(Dictionary.Keys.BigUint(256), routersDictionaryValue);
+        routersDict.set(bufferToBigUint256(ptjRouter.address.hash), 0n);
+        collectionConfig = {
+            collectionContent: 'collection_content',
+            commonContent: 'common_content',
+            secondOwner: secondOwner.address,
+            nextItemIndex: 0n,
+            nftItemCode: nftItemCode,
+            owner: deployer.address,
+            royalty: {
+                factor: 100n,
+                base: 200n,
+                address: deployer.address
+            },
+            routers: routersDict,
+        }
+        collection = blockchain.openContract(CampaignsCollection.createFromConfig(collectionConfig, code));
+
     });
 
     it('should deploy', async () => {
@@ -121,21 +144,48 @@ describe('PtjRouter', () => {
     });
 
     it('should accept PTJ donation', async () => {
+        let res = await collection.sendDeployNewNft(owner.getSender(), toNano('0.1'), {
+            passAmount: toNano('0.05'),
+            campaignId: 0n,
+            itemOwnerAddress: owner.address,
+        });
+
+        expect(res.transactions).toHaveTransaction({
+            exitCode(x) {
+                return x == 0 || x == -1;
+            },
+        });
+
+        // Basic nft item data
+        let nftItemData = beginCell()
+            .storeUint(0n, 64)
+            .storeAddress(collection.address)
+            .endCell();
+
+        const nftItemContract = blockchain.openContract(Campaign.createFromConfig({
+            index: 0n,
+            collectionAddress: collection.address
+        }, nftItemCode));
+
         // Top Up donor's PTJ balance
         await minterContract.sendMint(deployer.getSender(), donor.address, toNano('1'), toNano('0.09'), toNano('0.15'));
 
+        // Top Up the Router's PTJ balance to handle burnings
+        await minterContract.sendMint(deployer.getSender(), ptjRouter.address, toNano('1000'), toNano('0.09'), toNano('0.15'));
+
         // get donor jetton wallet address
         const donorJWallet = await minterContract.getWalletAddress(donor.address);
-        const res = await blockchain.openContract(JettonWallet.createFromAddress(donorJWallet))
+
+        res = await blockchain.openContract(JettonWallet.createFromAddress(donorJWallet))
             .sendTransfer(
                 donor.getSender(),
-                toNano('0.15'), // Message Value
+                toNano('0.2'), // Message Value
                 toNano('1'), // Jetton amount
                 ptjRouter.address, // Receiver
                 donor.address, // Excess response_address
                 null, // custom payload
-                toNano('0.1'), // forward ton
-                beginCell().storeAddress(randomAddress()).endCell() // CAMPAIGN NFT ADDRESS
+                toNano('0.15'), // forward ton
+                beginCell().storeAddress(nftItemContract.address).endCell() // CAMPAIGN NFT ADDRESS
             );
 
         printTransactionFees(res.transactions);
