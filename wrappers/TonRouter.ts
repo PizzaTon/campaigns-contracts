@@ -79,9 +79,13 @@ export function tonRouterConfigToCell(config: TonRouterConfig): Cell {
         .storeCoins(config.minBurn)
         .storeCoins(0) // burn storage
         .storeUint(0, 64) // Jetton ID (TON = 0)
-        .storeBuffer(config.publicKey, 32) // external owner public key
-        .storeAddress(config.owner)
-        .storeAddress(config.secondOwner)
+        .storeRef(
+            beginCell()
+                .storeBuffer(config.publicKey, 32) // external owner public key
+                .storeAddress(config.owner)
+                .storeAddress(config.secondOwner)
+                .endCell()
+        )
         .storeRef(
             beginCell()
                 .storeAddress(config.jettonMasterAddress)
@@ -181,6 +185,19 @@ export class TonRouter implements Contract {
             {
                 value: toNano('0.1'),
                 body: msgBody,
+            }
+        );
+    }
+
+    async sendUpdatePublicKey(provider: ContractProvider, via: Sender, pubKey: Buffer) {
+        return await provider.internal(via,
+            {
+                value: toNano('0.1'),
+                body: beginCell()
+                    .storeUint(0xC, 32)
+                    .storeUint(0, 64)
+                    .storeBuffer(pubKey, 32)
+                    .endCell(),
             }
         );
     }

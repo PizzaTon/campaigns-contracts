@@ -7,19 +7,36 @@
 
 (int, int, int, int, int, int, int, slice, slice, cell, cell, cell) load_data() inline {
   var ds = get_data().begin_parse();
+  int is_active = ds~load_int(1); ;; is_active
+  int seqno = ds~load_uint(32); ;; seqno
+  int ptj_balance = ds~load_coins(); ;; ptj balance
+  int min_burn = ds~load_coins(); ;; min burn amount
+  int burn_storage = ds~load_coins(); ;; burn storage
+  int jetton_id = ds~load_uint(64) + 1; ;; jetton id (name)
+
+  cell ownership = ds~load_ref();
+  slice ownership_s = ownership.begin_parse();
+  int public_key = ownership_s~load_uint(256); ;; public_key
+  slice owner_address =  ownership_s~load_msg_addr(); ;; owner_address
+  slice second_owner = ownership_s~load_msg_addr(); ;; second_owner
+
+  cell jetton = ds~load_ref(); ;; master_address and jetton_wallet_code
+  cell factors = ds~load_ref(); ;; factors
+  cell exchange_rate = ds~load_ref(); ;; exchange_rate
+
   return (
-    ds~load_int(1), ;; is_active
-    ds~load_uint(32), ;; seqno
-    ds~load_coins(), ;; ptj balance
-    ds~load_coins(), ;; min burn amount
-    ds~load_coins(), ;; burn storage
-    ds~load_uint(64) + PTJ_JETTON_ID, ;; jetton id (name)
-    ds~load_uint(256), ;; public_key
-    ds~load_msg_addr(), ;; owner_address
-    ds~load_msg_addr(), ;; second_owner
-    ds~load_ref(), ;; master_address and jetton_wallet_code
-    ds~load_ref(), ;; factors
-    ds~load_ref() ;; exchange_rate
+    is_active,
+    seqno,
+    ptj_balance,
+    min_burn,
+    burn_storage,
+    jetton_id,
+    public_key,
+    owner_address,
+    second_owner,
+    jetton,
+    factors,
+    exchange_rate
   );
 }
 
@@ -31,10 +48,14 @@
       .store_coins(jetton_balance)
       .store_coins(min_burn)
       .store_coins(burn_storage)
-      .store_uint(jetton_id - PTJ_JETTON_ID, 64)
-      .store_uint(public_key, 256)
-      .store_slice(owner_address)
-      .store_slice(second_owner)
+      .store_uint(jetton_id - 1, 64)
+      .store_ref(
+      begin_cell()
+              .store_uint(public_key, 256)
+              .store_slice(owner_address)
+              .store_slice(second_owner)
+            .end_cell()
+      )
       .store_ref(
         begin_cell()
           .store_slice(jetton_master_address)
@@ -183,7 +204,6 @@
         jetton_balance -=  burn_storage + burn_amount;
       } else {
         burn_storage += burn_amount;
-        jetton_balance -= burn_amount;
       }
     }
 
@@ -257,6 +277,8 @@
     .store_ref(state_init)
     .store_ref(msg);
     send_raw_message(msg_body.end_cell(), 64);
+
+    jetton_balance -= amount;
 
     return ();
   }

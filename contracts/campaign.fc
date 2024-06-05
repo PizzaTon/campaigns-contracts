@@ -77,7 +77,6 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
         (slice new_owner, active_until, status, routers) = (in_msg_body~load_msg_addr(), in_msg_body~load_uint(64), in_msg_body~load_int(1), in_msg_body~load_dict());
         slice new_owner_address = new_owner;
         int sender = new_owner_address.skip_bits(11).preload_uint(256);
-        builder result = concat(concat(num_to_str(index, 10), begin_cell().store_uint("/"u, 8).end_cell().begin_parse()).end_cell().begin_parse(), new_owner);
 
         store_data(index, collection_address, new_owner, begin_cell()
         .store_slice(to_string(index))

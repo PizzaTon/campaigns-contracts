@@ -68,12 +68,12 @@
     cell jetton_wallet_code = jetton_wallet_slice~load_ref();
 
     if (op == op::jetton_transfer_notification()) {
-        throw_unless(502, is_active); ;; anyway
-
         ;; jetton transfer notification
         cell state_init = calculate_jetton_wallet_state_init(my_address(), jetton_master_address, jetton_wallet_code);
         slice jetton_wallet_address = calculate_jetton_wallet_address(state_init);
         throw_unless(501, equal_slices(jetton_wallet_address, sender_address));
+
+        throw_unless(502, is_active); ;; anyway
 
         int amount = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
